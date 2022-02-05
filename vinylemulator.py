@@ -1,63 +1,31 @@
 import time
 import nfc
 import pychromecast
-from pychromecast.controllers.spotify import SpotifyController
+from spotify_controller import SpotifyController
 import spotify_token as st
 import spotipy
+from spotipy.oauth2 import SpotifyOAuth
+from const import *
 
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning) 
-
-#########################################################
-#####            CONFIGURATION VARIABLES            #####
-#########################################################
-ip     = "192.168.0.9"
-sp_dc  = ""
-sp_key = ""
+# TODO: Should be able to use the same credentials for both
+# starting spotify on the chromecast and using spotify
+# but I could never get it to work
 
 def main():
-    # Connect to NFC reader
-    try:
-        reader = nfc.ContactlessFrontend('usb')
-    except IOError as e:
-        print ("... could not connect to reader")
+    uri = "spotify:album:02tIakRsIFGW8sO4pBtJgj"
+    play(uri)
 
-    #wait till we're tagged
-    while True:
-        reader.connect(rdwr={'on-connect': touched, 'beep-on-connect': True})
-        time.sleep(0.1)
+    # # Connect to NFC reader
+    # try:
+    #     reader = nfc.ContactlessFrontend('usb')
+    # except IOError as e:
+    #     print ("... could not connect to reader")
+    #     return
 
-
-#########################################################
-#####              CONNECT TO SERVICES              #####
-#########################################################
-def connect():
-    """Used to activate spotify application on google home, then find that device in spotify"""
-    # Wait for connection to the chromecast
-    cast = pychromecast.Chromecast(ip)
-    cast.wait()
-
-    # Create a spotify token
-    data = st.start_session(sp_dc, sp_key)
-    access_token = data[0]
-    expires = data[1] - int(time.time())
-
-    # Launch the spotify app on the cast we want to cast to
-    sp = SpotifyController(access_token, expires)
-    cast.register_handler(sp)
-    sp.launch_app()
-
-    # Query spotify for active devices
-    client = spotipy.Spotify(auth=access_token)
-    devices_available = client.devices()
-
-    # Match active spotify devices with the spotify controller's device id
-    for device in devices_available["devices"]:
-        if device["id"] == sp.device:
-            spotify_device_id = device["id"]
-            break
-
-    return client, spotify_device_id
+    # #wait till we're tagged
+    # while True:
+    #     reader.connect(rdwr={'on-connect': touched, 'beep-on-connect': True})
+    #     time.sleep(1)
 
 
 #########################################################
@@ -65,26 +33,59 @@ def connect():
 #########################################################
 def touched(tag):
     """Connect to spotify, then send URI found on tag to it"""
-
     #send uri
     if tag.ndef:
         # Connect to google device and spotify
-        client, device = connect()
-
         for record in tag.ndef.records:
             uri = record.text
-            # uri = "spotify:album:02tIakRsIFGW8sO4pBtJgj"
-
-            print("Read from NFC tag: "+ uri)
-
-            #if it's a track just play it
-            if "track" in uri:
-                client.start_playback(device_id=device, uris=[uri])
-            #if it's an album/artist/playlist
-            else:
-                client.start_playback(device_id=device, context_uri=uri)
+            play(uri)
 
     return True
+
+#########################################################
+#####             PLAY A SPECIFIC URI               #####
+#########################################################
+def play(uri):
+    client, device = connect()
+
+    #if it's a track just play it
+    if "track" in uri:
+        client.start_playback(device_id=device, uris=[uri])
+    #if it's an album/artist/playlist
+    else:
+        client.start_playback(device_id=device, context_uri=uri)
+
+
+#########################################################
+#####            CONNECT TO GH & SPOTIFY            #####
+#########################################################
+def connect():
+    # Connect to the chromecast
+    cast = pychromecast.Chromecast(ip)
+    cast.wait()
+
+    # Launch spotify app on the chromecast
+    data = st.start_session(sp_dc, sp_key)
+    access_token = data[0]
+    expires = data[1] - int(time.time())
+    sp = SpotifyController(access_token, expires)
+    cast.register_handler(sp)
+    sp.launch_app()
+
+    # Check what devices are available now
+    auth = SpotifyOAuth(scope=scope,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    redirect_uri=redirect_uri,
+                    cache_path="./.spotify.txt")
+    client = spotipy.Spotify(auth_manager=auth)
+    devices_available = client.devices()
+
+    # Match active spotify devices with the spotify controller's device id
+    spotify_device_id = [d["id"] for d in devices_available["devices"] if d["id"] == sp.device][0]
+
+    return client, spotify_device_id
+
 
 if __name__ == "__main__":
     main()
