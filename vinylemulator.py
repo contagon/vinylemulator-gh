@@ -12,20 +12,20 @@ from const import *
 # but I could never get it to work
 
 def main():
-    uri = "spotify:album:02tIakRsIFGW8sO4pBtJgj"
-    play(uri)
+    # uri = "spotify:album:02tIakRsIFGW8sO4pBtJgj"
+    # play(uri)
 
-    # # Connect to NFC reader
-    # try:
-    #     reader = nfc.ContactlessFrontend('usb')
-    # except IOError as e:
-    #     print ("... could not connect to reader")
-    #     return
+    # Connect to NFC reader
+    try:
+        reader = nfc.ContactlessFrontend('usb')
+    except IOError as e:
+        print ("... could not connect to reader")
+        return
 
-    # #wait till we're tagged
-    # while True:
-    #     reader.connect(rdwr={'on-connect': touched, 'beep-on-connect': True})
-    #     time.sleep(1)
+    #wait till we're tagged
+    while True:
+        reader.connect(rdwr={'on-connect': touched, 'beep-on-connect': True})
+        time.sleep(1)
 
 
 #########################################################
@@ -77,7 +77,7 @@ def connect():
                     client_id=client_id,
                     client_secret=client_secret,
                     redirect_uri=redirect_uri,
-                    cache_path="./.spotify.txt")
+                    cache_path="/home/pi/vinylemulator-gh/.spotify.txt")
     client = spotipy.Spotify(auth_manager=auth)
     devices_available = client.devices()
 
